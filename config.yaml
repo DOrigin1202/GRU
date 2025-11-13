@@ -1,0 +1,135 @@
+# 모델 기본 정보
+model_info:
+  name : "Simple_GRU"
+  version : "1.0.0"
+  framework : "PyTorch"
+  trained_data : "2024-11-03"
+  author : "Dongin Jung"
+
+# 데이터 정보
+data:
+  source: "BEMS 전력 데이터"
+
+  #결측치 채우기
+  fill_in_missing_values:
+    original_data : "power_15m_data.csv"
+    output_data  : "filled_data_improved.csv"
+
+    # 추가된 데이터의 개수
+    total_added_data: 581
+    short_missing: 44 # 앞뒤 값의 평균으로 채운 데이터 수
+    medium missing: 12 # 선형 보간으로 채운 데이터 수
+    long missing: 525 # 패턴 기반으로 채운 데이터 수
+    
+  
+  # 모델에 사용한 데이터
+  model_data:
+    source_file: "filled_data_improved.csv"
+    # 제거한 데이터 
+    dropped_data:
+      droppend_len : "96"
+      start: "2025-08-21 00:00:00"
+      end: "2025-08-21 23:45:00"
+
+    # 학습 기간
+    train_period:
+      start: "2025-08-22 00:00:00"
+      end: "2025-09-29 05:30:00"
+      samples: 3671
+    # 검증 기간  
+    validation_period:
+      start: "2025-09-29 05:45:00"
+      end: "2025-10-07 09:30:00"
+      samples : 786
+    # 테스트 기간  
+    test_period:
+      start: 2025-10-07 09:45:00"
+      end: "2025-10-15 14:30:00"
+      samples : 788
+
+# 전처리 정보
+preprocessing :
+  scaling_method : "MinMaxScaler"
+  scaling_range : [0, 1]
+  # 결측치 처리 방법
+  missing_data_handling : 
+    method: "hybrid" # 혼합 방식 사용
+    short_gap : "평균값" # 짧은 구간
+    middle_gap: "선형 보간" # 중간 구간
+    long_gap : "패턴 기반" # 긴 구간
+  
+  # 사용할 컬럼들
+  input_columns :
+    - "hour_sin" 
+    - "hour_cos"
+    - "day_of_week_sin"
+    - "day_of_week_cos"
+    - "is_weekend"
+    - "is_holiday"
+    - "power_lag_1"
+    - "power_lag_4"
+    - "power_lag_12"
+    - "power_lag_96"
+    - "power_diff"
+    - "power_diff_2"
+    - "power_diff_4"
+    - "power_accel"
+    - "power_std_12"
+  # 시계열 윈도우
+  sequence_legnth : 96
+
+# 모델 아키텍처
+model:
+  type: "GRU"
+  input_size : 15
+  hidden_size : 128
+  num_layers : 3
+  dropout : 0.3
+  bidirectional : false
+  batch_first : true
+
+# 학습 설정
+training:
+  epochs: 200
+  batch_size: 32
+  learning_raet: 0.001
+
+
+  # Optimizer
+  optimizer: "Adam"
+
+  # Loss function
+  loss_function:
+    type:  "WeightedMSELoss"
+    peak_weight: 2.0
+    normal_weight: 1.0
+    threshold_multiplier : 2.3
+
+  # scheduler
+  scheduler: "ReduceLROnPlateau"
+  scheduler_params:
+    mode: "min"
+    factor: 0.5
+    patience: 20
+    min_lr : 0.00001
+
+  #사용한 device
+  device: "cuda"
+  
+
+# 성능 지표 단위
+performance:
+  test_mae: 0.4033
+  test_r2: 0.8734
+  test_rmse: 0.6071
+  test_mape: 23.98
+
+# 파일 경로
+paths:
+  config_file: "configs/config.yaml"
+  model_file: "models/model.pth"
+  x_scaler_file: "scalers/scaler_X.pkl"
+  y_scaler_file: "scalers/scaler_y.pkl"
+  spec_file: 
+    - "specs/feature_spec.json" 
+    - "specs/training_metadata.json"

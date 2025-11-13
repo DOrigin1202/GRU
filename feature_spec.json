@@ -1,0 +1,43 @@
+{
+    "target" : "current_power_kw",
+    "sequence_length" : 96,
+
+    "sampling_minutes" : 15,
+
+    "feature_columns": [
+        "hour_sin" ,"hour_cos", "day_of_week_sin", "day_of_week_cos", 
+        "is_weekend", "is_holiday", 
+        "power_lag_1", "power_lag_4","power_lag_12", "power_lag_96", 
+        "power_diff", "power_diff_2","power_diff_4", 
+        "power_accel", "power_std_12"
+    ],
+    "feature_types" : {
+        "cyclical" : ["hour_sin", "hour_cos", "day_of_week_sin", "day_of_week_cos"],
+        "binary" : ["is_weekend", "is_holiday"],
+        "lag" : ["power_lag_1", "power_lag_4", "power_lag_12", "power_lag_96"],
+        "diff": ["power_diff", "power_diff_2", "power_diff_4"],
+        "rolling": ["power_accel", "power_std_12"]
+    },
+    "preprocessing" :{
+        "missing_data":{
+            "method" : "hybrid",
+            "short_gap" : "mean",
+            "median_gap": "linear_interpolation",
+            "long_gap" : "pattern-based"
+        },
+        "outlier_handling" : null,
+        "scaling":{
+            "method":"MinMaxScaler",
+            "feature_range" : [0, 1],
+            "X_scaler": "artifacts/scalers/scaler_X.pkl",
+            "y_scaler": "artifacts/scalers/scaler_y.pkl"
+        }
+    },
+
+    "data_shape":{
+        "data_shape" : [96, 15],
+        "output_shape" : [1],
+        "description" : "Input: (sequence_length=96, n_features=15), Output: (1,)"
+    }
+    
+}

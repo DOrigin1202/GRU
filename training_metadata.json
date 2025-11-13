@@ -1,0 +1,16 @@
+{
+    "meter_id":1,
+    "channel_no":1,
+
+    "train_ts_start": "2025-08-22 00:00:00",
+    "train_ts_end" : "2025-10-15 14:30:00",
+
+    "train_samples": 5245,
+
+    "sequence_length" : 96,
+    "data_sampling_minutes":15,
+
+    "hyperparams":{"hidden_size":128, "num_layers":3,"dropout":0.3,"lr":0.001,"batch_size":64},
+
+    "framework": {"torch": "2.8.0", "python": "3.12.12", "cuda": "12.5"}
+}
