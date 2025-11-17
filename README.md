@@ -1,249 +1,250 @@
-# AIEMS API
+# BEMS 전력 소비 예측 GRU 모델
 
-GRU 모델 학습 및 예측을 위한 FastAPI 서버입니다.
+[![PyTorch](https://img.shields.io/badge/PyTorch-2.8.0-EE4C2C?logo=pytorch)](https://pytorch.org/)
+[![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python)](https://www.python.org/)
+[![CUDA](https://img.shields.io/badge/CUDA-12.5-76B900?logo=nvidia)](https://developer.nvidia.com/cuda-toolkit)
 
-## 기능
+BEMS(Building Energy Management System) 전력 데이터를 활용한 시계열 예측 프로젝트입니다. GRU(Gated Recurrent Unit) 모델을 사용하여 15분 단위의 전력 소비를 예측합니다.
 
-- CSV 데이터 업로드
-- GRU 모델 학습
-- 시계열 예측
-- 회귀분석 모델 생성
-- 다중 변수 회귀분석
-- 회귀분석 결과 예측
-- 학습 히스토리 조회
-- 모델 상태 모니터링
-- **Modbus TCP 전력 데이터 수집**
-- **실시간 전력량계 모니터링**
-- **전력 데이터 저장 및 조회**
-- **시계열 전력 데이터 분석**
+## 📊 프로젝트 개요
 
-## 실행 방법
+- **목적**: 건물 에너지 관리 시스템의 전력 소비 패턴 예측
+- **데이터**: 15분 간격의 전력 소비 데이터
+- **모델**: PyTorch 기반 3-layer GRU
+- **예측 방식**: 과거 96개 시퀀스(24시간)를 활용한 단일 시점 예측
 
-### Docker Compose 사용 (권장)
+## 🎯 담당 역할
 
+본 프로젝트에서 다음 작업을 수행했습니다:
+
+- ✅ **데이터 전처리**: 결측치 처리, 시계열 특성 엔지니어링
+- ✅ **GRU 모델 설계 및 구현**: PyTorch 기반 3-layer GRU 아키텍처
+- ✅ **설정 파일 관리**: `config.yaml`, `feature_spec.json`, `training_metadata.json` 구조 설계 및 작성
+
+## 📁 프로젝트 구조
+
+```
+GRU-main/
+├── GRU모델.ipynb              # 데이터 전처리부터 모델 학습까지 전체 파이프라인
+├── gru_model_2.pth            # 학습된 모델 가중치
+├── config.yaml                # 모델 및 학습 설정
+├── feature_spec.json          # 특성 정의 및 전처리 사양
+├── training_metadata.json     # 학습 메타데이터
+└── README.md                  # 프로젝트 문서
+```
+
+## 🔧 주요 기술 스택
+
+### 개발 환경
+- Python 3.12.12
+- PyTorch 2.8.0
+- CUDA 12.5
+
+### 주요 라이브러리
+- **데이터 처리**: pandas, numpy
+- **모델링**: PyTorch
+- **시각화**: matplotlib
+- **전처리**: scikit-learn (MinMaxScaler)
+
+## 📈 데이터 전처리
+
+### 1. 결측치 처리
+3단계 하이브리드 방식을 적용하여 총 581개의 결측 데이터를 복원했습니다:
+
+| 결측 유형 | 처리 방법 | 데이터 수 |
+|---------|---------|---------|
+| 단기 결측 | 앞뒤 평균값 | 44개 |
+| 중기 결측 | 선형 보간 | 12개 |
+| 장기 결측 | 패턴 기반 | 525개 |
+
+### 2. 특성 엔지니어링
+총 15개의 특성을 생성했습니다:
+
+**시간적 특성 (Cyclical Encoding)**
+- `hour_sin`, `hour_cos`: 시간의 순환적 특성
+- `day_of_week_sin`, `day_of_week_cos`: 요일의 순환적 특성
+- `is_weekend`, `is_holiday`: 주말/공휴일 이진 특성
+
+**지연 특성 (Lag Features)**
+- `power_lag_1`: 15분 전 전력
+- `power_lag_4`: 1시간 전 전력
+- `power_lag_12`: 3시간 전 전력
+- `power_lag_96`: 24시간 전 전력
+
+**차분 특성 (Difference Features)**
+- `power_diff`: 1차 차분
+- `power_diff_2`: 2차 차분
+- `power_diff_4`: 4차 차분
+- `power_accel`: 가속도 (2차 차분의 차분)
+
+**통계적 특성**
+- `power_std_12`: 3시간 이동 표준편차
+
+### 3. 정규화
+- MinMaxScaler를 사용하여 [0, 1] 범위로 정규화
+- 입력 특성과 타겟 변수에 별도의 스케일러 적용
+
+## 🧠 모델 아키텍처
+
+### GRU 모델 구조
+```python
+GRU(
+  input_size=15,      # 특성 개수
+  hidden_size=128,    # 은닉층 크기
+  num_layers=3,       # 레이어 수
+  dropout=0.3,        # 드롭아웃 비율
+  batch_first=True    # 배치를 첫 번째 차원으로
+)
+```
+
+### 시퀀스 구조
+- **입력 형태**: (batch_size, 96, 15)
+  - 96: 시퀀스 길이 (24시간 = 96 × 15분)
+  - 15: 특성 개수
+- **출력 형태**: (batch_size, 1)
+  - 다음 시점(15분 후)의 전력 소비 예측값
+
+## 🎓 학습 설정
+
+### 손실 함수
+피크 시간대 예측 성능 향상을 위한 가중 MSE Loss 적용:
+
+```python
+WeightedMSELoss(
+  peak_weight=2.0,           # 피크 시간 가중치
+  normal_weight=1.0,         # 일반 시간 가중치
+  threshold_multiplier=2.3   # 피크 판정 기준 (평균의 2.3배)
+)
+```
+
+### 최적화
+- **Optimizer**: Adam (lr=0.001)
+- **Scheduler**: ReduceLROnPlateau
+  - factor: 0.5
+  - patience: 20
+  - min_lr: 0.00001
+- **Batch Size**: 32
+- **Epochs**: 200
+- **Device**: CUDA
+
+### 데이터 분할
+| 구분 | 기간 | 샘플 수 |
+|-----|------|---------|
+| 훈련 | 2025-08-22 ~ 2025-09-29 | 3,671 |
+| 검증 | 2025-09-29 ~ 2025-10-07 | 786 |
+| 테스트 | 2025-10-07 ~ 2025-10-15 | 788 |
+| **총합** | | **5,245** |
+
+## 📊 모델 성능
+
+테스트 데이터셋에서의 성능 지표:
+
+| Metric | Value |
+|--------|-------|
+| MAE | 0.4033 kW |
+| RMSE | 0.6071 kW |
+| R² Score | 0.8734 |
+| MAPE | 23.98% |
+
+## 💾 설정 파일 설명
+
+### config.yaml
+모델 전체 설정을 관리하는 메인 설정 파일입니다:
+- 모델 메타정보 (버전, 프레임워크, 작성자)
+- 데이터 전처리 방법 및 파라미터
+- 모델 아키텍처 하이퍼파라미터
+- 학습 설정 (에포크, 배치 사이즈, 옵티마이저)
+- 손실 함수 및 스케줄러 설정
+- 성능 지표
+
+### feature_spec.json
+특성 정의 및 데이터 형상 명세:
+- 타겟 변수 및 시퀀스 길이
+- 특성 컬럼 리스트 및 유형별 분류
+- 전처리 방법 (결측치, 스케일링)
+- 입력/출력 데이터 형상
+
+### training_metadata.json
+학습 실행 메타데이터:
+- 학습 데이터 기간 및 샘플 수
+- 하이퍼파라미터 스냅샷
+- 프레임워크 버전 정보
+
+## 🚀 사용 방법
+
+### 1. 환경 설정
 ```bash
-# 서버 시작
-docker-compose up --build
-
-# 백그라운드 실행
-docker-compose up -d --build
-
-# 서버 중지
-docker-compose down
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu125
+pip install pandas numpy scikit-learn matplotlib pyyaml
 ```
 
-### Docker 직접 사용
-
-```bash
-# 이미지 빌드
-docker build -t aidems-api .
-
-# 컨테이너 실행
-docker run -p 8000:8000 aidems-api
+### 2. 학습
+```python
+# 노트북 파일 참조
+jupyter notebook GRU모델.ipynb
 ```
 
-### 로컬 실행
+### 3. 추론
+```python
+import torch
+import pickle
 
-```bash
-# 의존성 설치
-pip install -r requirements.txt
+# 모델 로드
+model = SimpleGRU(input_size=15, hidden_size=128, num_layers=3, dropout=0.3)
+model.load_state_dict(torch.load('gru_model_2.pth'))
+model.eval()
 
-# 서버 실행
-python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+# 스케일러 로드
+with open('scaler_X.pkl', 'rb') as f:
+    scaler_X = pickle.load(f)
+with open('scaler_y.pkl', 'rb') as f:
+    scaler_y = pickle.load(f)
+
+# 예측
+with torch.no_grad():
+    # X: (1, 96, 15) 형태의 입력
+    X_scaled = scaler_X.transform(X.reshape(-1, 15)).reshape(1, 96, 15)
+    X_tensor = torch.FloatTensor(X_scaled)
+    pred_scaled = model(X_tensor)
+    pred = scaler_y.inverse_transform(pred_scaled.numpy())
 ```
 
-## API 엔드포인트
+## 📝 주요 개선 사항
 
-### 기본 엔드포인트
+1. **피크 시간대 예측 향상**
+   - 가중 손실 함수를 통해 피크 시간의 예측 정확도 개선
+   - threshold_multiplier로 피크 시간 동적 판정
 
-- `GET /` - 루트 엔드포인트
-- `GET /health` - 헬스체크
+2. **풍부한 특성 엔지니어링**
+   - 순환 인코딩으로 시간의 주기성 표현
+   - 다양한 지연 특성으로 시간적 의존성 포착
+   - 차분 및 통계 특성으로 변화율과 변동성 반영
 
-### 데이터 관리
+3. **체계적인 결측치 처리**
+   - 결측 구간 길이에 따른 적응적 보간 방법 적용
+   - 장기 결측에 패턴 기반 복원으로 데이터 품질 향상
 
-- `POST /api/data/upload` - 훈련 데이터 업로드 (CSV)
+4. **재현 가능한 설정 관리**
+   - YAML/JSON 기반 설정 파일로 실험 추적 용이
+   - 버전 관리 및 하이퍼파라미터 히스토리 관리
 
-### 전력량계 관리
+## 🔍 향후 개선 방향
 
-- `GET /api/power-meters` - 전력량계 목록 조회
-- `GET /api/power-meters/{meter_id}` - 특정 전력량계 정보 조회
+- [ ] Attention 메커니즘 추가로 장기 의존성 강화
+- [ ] 외부 변수(온도, 습도) 통합
+- [ ] 멀티스텝 예측으로 확장
+- [ ] 앙상블 모델 적용
 
-### 전력 데이터 관리
+## 👤 Author
 
-- `POST /api/power-data` - 전력 데이터 저장
-- `POST /api/power-data/batch` - 전력 데이터 일괄 저장
-- `GET /api/power-data/{meter_id}` - 전력 데이터 조회
-- `GET /api/power-data/{meter_id}/latest` - 최신 전력 데이터 조회
-- `GET /api/power-data/{meter_id}/stats` - 전력 데이터 통계
-- `GET /api/power-data/{meter_id}/timeseries` - 시계열 전력 데이터
-- `DELETE /api/power-data/{meter_id}` - 오래된 전력 데이터 삭제
-- `GET /api/power-data/{meter_id}/trend` - 전력 소비량 트렌드 분석
-- `GET /api/power-data/{meter_id}/quality` - 전력 품질 지표 분석
+**정동인 (Dongin Jung)**
+- Role: AI Engineer Intern
+- Contact: [jde577776@gmail.com/[GitHub 링크](https://github.com/DOrigin1202)]
 
+## 📄 License
 
+이 프로젝트는 [라이선스 유형]에 따라 라이선스가 부여됩니다.
 
-### GRU 모델 관련
+---
 
-- `POST /api/gru/train` - GRU 모델 학습
-- `POST /api/gru/predict` - 예측 실행
-- `POST /api/gru/predict-from-db` - 데이터베이스 기반 예측
-
-### 회귀분석 관련
-
-- `POST /api/regression/analyze` - 회귀분석 실행
-- `GET /api/regression/results/{user_id}` - 회귀분석 결과 조회
-- `GET /api/regression/predict/{user_id}` - 회귀분석 예측
-- `GET /api/regression/models/{user_id}` - 사용 가능한 모델 목록
-- `GET /api/regression/status/{user_id}` - 회귀분석 상태 조회
-- `DELETE /api/regression/results/{user_id}` - 회귀분석 결과 삭제
-
-### 스케줄러 관련
-
-- `POST /api/scheduler/start` - 스케줄러 시작
-- `POST /api/scheduler/stop` - 스케줄러 중지
-- `GET /api/scheduler/status` - 스케줄러 상태 조회
-- `POST /api/scheduler/manual-update` - 수동 주간 업데이트
-- `GET /api/scheduler/active-users` - 활성 사용자 목록
-
-### 모델 관리
-
-- `GET /api/model/status` - 모델 상태 조회
-- `POST /api/model/save` - 모델 저장
-- `POST /api/model/load` - 모델 로드
-- `DELETE /api/model/reset` - 모델 상태 초기화
-
-## API 문서
-
-- Swagger UI: `http://localhost:8000/docs`
-- ReDoc: `http://localhost:8000/redoc`
-
-### 사용 예시
-
-#### 1. 데이터 업로드
-```bash
-curl -X POST "http://localhost:8000/api/data/upload" \
-     -H "Content-Type: multipart/form-data" \
-     -F "file=@your_data.csv"
-```
-
-#### 2. 모델 학습
-```bash
-curl -X POST "http://localhost:8000/api/lstm/train" \
-     -H "Content-Type: application/json" \
-     -d '{
-       "sequence_length": 10,
-       "epochs": 100,
-       "batch_size": 32,
-       "learning_rate": 0.001
-     }'
-```
-
-#### 3. 예측
-```bash
-curl -X POST "http://localhost:8000/api/lstm/predict" \
-     -H "Content-Type: application/json" \
-     -d '{
-       "input_sequence": [1.0, 2.0, 3.0, 4.0, 5.0],
-       "model_name": "lstm_model"
-     }'
-```
-
-#### 4. 회귀분석 실행
-```bash
-curl -X POST "http://localhost:8000/api/regression/analyze" \
-     -H "Content-Type: application/json" \
-     -d '{
-       "MBER_ID": "user123",
-       "energy_sources": ["전력", "가스"]
-     }'
-```
-
-#### 5. 회귀분석 결과 조회
-```bash
-curl -X GET "http://localhost:8000/api/regression/results/user123"
-```
-
-#### 6. 회귀분석 예측
-```bash
-curl -X GET "http://localhost:8000/api/regression/predict/user123?y_column=Y1&model_no=1&x_values=X1:25.5,X2:60.2,X3:15.8"
-```
-
-#### 7. 전력 소비량 트렌드 분석
-```bash
-curl -X GET "http://localhost:8000/api/power-data/1/trend?days=7"
-```
-
-#### 8. 전력 품질 지표 분석
-```bash
-curl -X GET "http://localhost:8000/api/power-data/1/quality?hours=24"
-```
-
-#### 9. 시계열 전력 데이터 조회
-```bash
-curl -X GET "http://localhost:8000/api/power-data/1/timeseries?start_time=2024-01-01T00:00:00&end_time=2024-01-02T00:00:00&interval=1h"
-```
-
-## 지원하는 기능
-
-- **데이터 업로드**: CSV 파일 형식 지원
-- **GRU 모델**: 시계열 데이터 학습 및 예측
-- **회귀분석**: 다중 변수 회귀분석 모델 생성
-- **회귀분석 예측**: 조건 기반 에너지 사용량 예측
-- **전력 데이터 관리**: 실시간 전력 측정 데이터 수집 및 저장
-- **전력 데이터 분석**: 시계열 집계, 트렌드 분석, 품질 지표 분석
-- **모니터링**: 학습 진행 상황 및 모델 상태 확인
-
-## 환경 변수
-
-- `PYTHONPATH`: Python 경로 설정
-- `PORT`: API 서버 포트 (기본값: 8000)
-
-## 개발
-
-### 프로젝트 구조
-
-```
-aidems-api-2025/
-├── app/                    # 애플리케이션 패키지
-│   ├── main.py            # FastAPI 메인 애플리케이션
-│   ├── routers/           # API 라우터들
-│   │   ├── base.py       # 기본 엔드포인트
-│   │   ├── data.py       # 데이터 관리
-│   │   ├── gru.py        # GRU 모델 API
-│   │   ├── power_data.py # 전력 데이터 관리 API
-│   │   ├── power_meters.py # 전력량계 관리 API
-│   │   ├── regression.py # 회귀분석 API
-│   │   └── model.py      # 모델 관리 API
-│   ├── models/            # 모델 정의
-│   │   ├── gru_model.py      # PyTorch GRU 모델 클래스
-│   │   ├── power_models.py   # 전력 데이터 ORM 모델
-│   │   ├── regression_model.py # statsmodels 회귀분석 모델 클래스
-│   │   └── schemas.py         # Pydantic 데이터 모델
-│   ├── services/          # 서비스 레이어
-│   │   ├── gru_service.py      # GRU 서비스 로직
-│   │   ├── power_orm_service.py # 전력 데이터 ORM 서비스
-│   │   ├── regression_service.py # 회귀분석 서비스
-│   │   └── visualization_service.py # 시각화 서비스
-│   └── ...                # 기타 모듈들
-├── requirements.txt        # Python 의존성
-├── Dockerfile             # Docker 이미지 설정
-├── docker-compose.yml     # Docker Compose 설정
-├── .dockerignore          # Docker 제외 파일
-└── README.md             # 프로젝트 문서
-```
-
-### 로그
-
-서버는 loguru를 사용하여 로그를 출력합니다. 주요 로그:
-- 데이터 업로드 상태
-- 모델 학습 진행 상황
-- 예측 요청/응답
-- 오류 정보
-
-## 주의사항
-
-1. 첫 학습 시 시간이 오래 걸릴 수 있습니다.
-2. GPU 사용을 위해서는 CUDA가 설치된 환경이 필요합니다.
-3. 메모리 사용량이 많을 수 있으므로 충분한 RAM을 확보하세요.
-4. 전력 데이터 분석은 pandas를 사용하여 시계열 집계를 수행합니다.
-5. 대용량 데이터 처리 시 메모리 사용량에 주의하세요. 
+⚡ **Built with PyTorch for Smart Energy Management**
