@@ -146,6 +146,15 @@ WeightedMSELoss(
 | R² Score | 0.8734 |
 | MAPE | 23.98% |
 
+### 예측 결과 시각화
+![예측 결과](images/prediction_results.png)
+
+**다양한 예측 윈도우 성능 비교**
+- **15분 예측**: MAE 0.022 kW, RMSE 0.022 kW (매우 높은 정확도)
+- **30분 예측**: MAE 0.016 kW, RMSE 0.017 kW (우수한 단기 예측)
+- **1시간 예측**: MAE 0.055 kW, RMSE 0.068 kW (안정적 예측)
+- **3시간 예측**: MAE 0.767 kW, RMSE 1.067 kW (장기 예측 도전 과제)
+- 
 ## 💾 설정 파일 설명
 
 ### config.yaml
