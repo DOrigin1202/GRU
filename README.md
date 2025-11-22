@@ -251,19 +251,23 @@ with torch.no_grad():
 ## 🔍 향후 개선 방향
 
 - [ ] Attention 메커니즘 추가로 장기 의존성 강화
-- [ ] 외부 변수(온도, 습도) 통합
-- [ ] 멀티스텝 예측으로 확장
-- [ ] 앙상블 모델 적용
+- [ ] 실시간 데이터 연동으로 최적모델을 제작하고 예측
+
 
 ## 👤 Author
 
 **정동인 (Dongin Jung)**
-- Role: AI Engineer Intern
-- Contact: [jde577776@gmail.com/[GitHub 링크](https://github.com/DOrigin1202)]
+- Role: AI Engineer Intern @ UCUBE
+- Email: jde577776@gmail.com
+- GitHub: [github.com/DOrigin1202](https://github.com/DOrigin1202)]
+- Notion: https://www.notion.so/2a986a6d9e1c80b79c16ee766de35773
 
 ## 📄 License
 
-이 프로젝트는 [라이선스 유형]에 따라 라이선스가 부여됩니다.
+
+© 2025 UCUBE. All rights reserved.
+
+This project is proprietary and confidential.
 
 ---
 
