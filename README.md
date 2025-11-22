@@ -165,7 +165,7 @@ WeightedMSELoss(
 - **30분 예측**: MAE 0.016 kW, RMSE 0.017 kW (우수한 단기 예측)
 - **1시간 예측**: MAE 0.055 kW, RMSE 0.068 kW (안정적 예측)
 - **3시간 예측**: MAE 0.767 kW, RMSE 1.067 kW (장기 예측 도전 과제)
-- 
+  
 ## 💾 설정 파일 설명
 
 ### config.yaml
